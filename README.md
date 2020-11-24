@@ -20,10 +20,10 @@ import explore as dex
 df = pd.read_csv(dir)
 
 # df summary
-print(df_summary(df))
+print(dex.summarize(df))
 
 dfs = [pd.read_csv(dir) for dir in dirs]
 
 # multiple df connect
-print(connect(dfs))
+print(dex.connect(dfs, dirs))
 ```
