@@ -106,6 +106,15 @@ def mask(df: pd.DataFrame, masking_function: Callable[[object], str]) -> str:
     strmask['group'] = strmask['mask'].apply(counter.group)
     strmask['count'] = strmask['group'].apply(counter.count)
     strmask = strmask[strmask['group']!=strmask['group'].shift(1)]
+
+    # TODO merge consecutive small groups into one:
+    # ##########*************
+    # #####***#*******##*****
+    # #####******************
+    # ###############********
+    # -> (always missing | always complete | can be both) -> (## | ** | #*) ->
+    # ######*###******#******
+    # #####*#*#********#*****
     strmask = strmask[strmask['count'] > MIN_GROUP*df.shape[0]]
 
     return __df_format(strmask)
