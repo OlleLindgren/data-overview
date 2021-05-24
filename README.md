@@ -1,7 +1,9 @@
 # data-overview
+
 Repository with a few small helper functions for quickly overviewing data
 
 ## Dependencies
+
 ```
 python>=3.6
 pandas
@@ -10,11 +12,12 @@ termcolor
 ```
 
 ## Install
-`pip install git+https://github.com/OlleLindgren/data-overview@v0.1`
+
+`pip install git+https://github.com/OlleLindgren/data-overview@v0.2`
 
 ## Usage
 
-```
+```python
 import explore as dex
 
 df = pd.read_csv(dir)
