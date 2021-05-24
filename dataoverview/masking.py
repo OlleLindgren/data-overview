@@ -19,13 +19,6 @@ __default_entries = {
 
 MaskEntries = namedtuple('Entries', __default_entries)(**__default_entries)
 
-def __set_entry(name: str, entry: MaskEntry):
-    # Modify or set a new MaskEntry
-    assert isinstance(name, str) and isinstance(entry, MaskEntry)
-    MaskEntries.__setattr__(name, entry)
-
-MaskEntries.add = __set_entry
-
 def __mask_format(mask_string: str) -> str:
     color = 'white'
     last_color = 'white'
