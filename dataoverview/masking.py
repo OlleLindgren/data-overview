@@ -75,7 +75,7 @@ def __inf_mask(number: float) -> str:
     return (MaskEntries.POSINF.symbol if number > 0 else MaskEntries.NEGINF.symbol) if np.isinf(number) else (MaskEntries.DEFAULT.symbol)
 
 def __filter_factory(filtering_lambda: Callable[[object], bool]) -> Callable[[object], str]:
-    return lambda _x: MaskEntries.PASS if filtering_lambda(_x) else MaskEntries.FAIL
+    return lambda _x: MaskEntries.PASS.symbol if filtering_lambda(_x) else MaskEntries.FAIL.symbol
 
 def __agg_mask(row: pd.Series) -> str:
     return ''.join(row)
