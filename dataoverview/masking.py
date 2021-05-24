@@ -47,17 +47,36 @@ def __item_format(item: object, length: int) -> str:
     result = str(item)
     return result + ' '*(length-len(result))
 
-def __df_format(masking_result: pd.DataFrame) -> str:
-    max_ix_len = max(map(len, masking_result.index.astype(str)))
+def __df_format(masking_result: pd.DataFrame, index_spacing: int) -> str:
     max_count_len = max(map(len, masking_result['count'].astype(str)))
     min_count = min(masking_result['count'])
     return '\n'.join((
-        __item_format(ix, max_ix_len) + ' '*COL_SPACING+
+        __item_format(ix, index_spacing) + ' '*COL_SPACING+
         __mask_format(mask_string) + ' '*COL_SPACING+
         __item_format(count, max_count_len) + ' '*COL_SPACING+
         '+'*int(5*(np.log(1+count)-np.log(1+min_count)))
         for ix, mask_string, count in zip(masking_result.index, masking_result['mask'], masking_result['count'])
     ))
+
+def __df_head_format(df: pd.DataFrame, index_spacing: int) -> str:
+    # Generate a header for a dataframe
+    col_marker = '*'
+    line_marker = "'"
+    line_space_marker = line_marker+' '
+
+    alternate_color = 'blue'
+    header = '\n'.join((
+        (colored(__item_format(col_name, index_spacing), alternate_color) if i%2==0 else __item_format(col_name, index_spacing))+
+        ' '*COL_SPACING+
+        colored(line_space_marker*(i//2)+line_marker*(i-2*(i//2)), alternate_color)+
+        (colored(col_marker, alternate_color) if i%2==0 else col_marker)+
+        ' '*(df.shape[1]-i-1)
+        for i, col_name in enumerate(df.columns)
+    ))
+    divider_line = colored(line_space_marker*(df.shape[1]//2)+line_marker*(df.shape[1]-2*(df.shape[1]//2)), alternate_color)
+    pre_spacing = ' '*index_spacing + ' '*COL_SPACING
+    divider = pre_spacing + divider_line
+    return header+'\n'+divider
 
 def __default_float_mask(number: float) -> str:
     if np.isposinf(number):
@@ -75,6 +94,7 @@ def __inf_mask(number: float) -> str:
     return (MaskEntries.POSINF.symbol if number > 0 else MaskEntries.NEGINF.symbol) if np.isinf(number) else (MaskEntries.DEFAULT.symbol)
 
 def __filter_factory(filtering_lambda: Callable[[object], bool]) -> Callable[[object], str]:
+    # Generate a lambda function that applies a filter given by some boolean lambda function
     return lambda _x: MaskEntries.PASS.symbol if filtering_lambda(_x) else MaskEntries.FAIL.symbol
 
 def __agg_mask(row: pd.Series) -> str:
@@ -117,7 +137,11 @@ def mask(df: pd.DataFrame, masking_function: Callable[[object], str]) -> str:
     # #####*#*#********#*****
     strmask = strmask[strmask['count'] > MIN_GROUP*df.shape[0]]
 
-    return __df_format(strmask)
+    max_col_name_len = max(map(len, df.columns))
+    max_ix_name_len = max(map(len, strmask.index.astype(str)))
+    index_spacing = max(max_ix_name_len, max_col_name_len)
+
+    return __df_head_format(df, index_spacing)+'\n'+__df_format(strmask, index_spacing)
 
 def na(df: pd.DataFrame) -> str:
     return mask(df, __nan_mask)
