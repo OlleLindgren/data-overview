@@ -24,7 +24,7 @@ def __set_entry(name: str, entry: MaskEntry):
     assert isinstance(name, str) and isinstance(entry, MaskEntry)
     MaskEntries.__setattr__(name, entry)
 
-MaskEntries.__setattr__("add", __set_entry)
+MaskEntries.add = __set_entry
 
 def __mask_format(mask_string: str) -> str:
     color = 'white'
