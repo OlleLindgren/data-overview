@@ -1,9 +1,9 @@
+from typing import Iterable, Tuple
 import pandas as pd 
 import numpy as np 
-import os
 from termcolor import colored
 
-def _col_summary(col):
+def _col_summary(col: pd.Series) -> Tuple:
     # Summary of column contents. Not meant to be run independency, but rather as a backend to summarize
 
     is_numeric = np.issubdtype(col.dtype, np.number)
@@ -96,7 +96,7 @@ def _col_summary(col):
         return name, dtype, na_msg, is_dupl_msg, unique_msg, '', '', example
         # return f'{col.name} | [{len(col)}*{col.dtype}]{na_msg}{is_dupl_msg}{unique_msg} | {example}'
 
-def summarize(df):
+def summarize(df: pd.DataFrame) -> str:
     # Summary of dataframe contents
 
     cols = ['name', 'dtype', 'na', 'dupl', 'unique', 'range', 'stdev', 'example']
@@ -119,7 +119,7 @@ def summarize(df):
         asstr += '\n'
     return asstr
 
-def connect(datasets, names):
+def connect(datasets: Iterable[pd.DataFrame], names: Iterable[str]) -> pd.DataFrame:
     assert len(datasets) >= 2
 
     all_cols = []
