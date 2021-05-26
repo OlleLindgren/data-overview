@@ -18,15 +18,26 @@ termcolor
 ## Usage
 
 ```python
-import explore as dex
+import dataoverview
 
-df = pd.read_csv(dir)
+# Get some data source. data_walk() -> Iterable[pd.DataFrame]
+from some_data_source import data_walk
+
+df = next(data_walk())
 
 # df summary
-print(dex.summarize(df))
+print(dataoverview.explore.summarize(df))
 
-dfs = [pd.read_csv(dir) for dir in dirs]
+dfs = [df for df in data_walk()]
+names = ['df '+str(i) for i in range(len(dfs))]
 
-# multiple df connect
-print(dex.connect(dfs, dirs))
+# See which columns multiple dataframes have in common they have in common
+print(dataoverview.explore.connect(dfs, names))
+
+# String representation of parts in dataframe that are nan
+# Very useful when joining data from different sources
+print(dataoverview.masking.na(df))
+
+# String representation of parts in dataframe that pass some filter
+print(dataoverview.masking.filter(df, lambda x: x > 0))
 ```
