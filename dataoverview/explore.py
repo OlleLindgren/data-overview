@@ -1,135 +1,235 @@
-from typing import Iterable, Tuple
-import pandas as pd 
-import numpy as np 
+from __future__ import annotations
+
+import itertools
+import statistics
+import string
+from typing import Any, Iterable, Tuple
+
+import numpy as np
+import pandas as pd
+
+pd.options.mode.use_inf_as_na = True
 from termcolor import colored
 
-def _col_summary(col: pd.Series) -> Tuple:
-    # Summary of column contents. Not meant to be run independency, but rather as a backend to summarize
 
-    is_numeric = np.issubdtype(col.dtype, np.number)
+def _is_numeric_datatype(datatype) -> bool:
+    return pd.api.types.is_numeric_dtype(datatype)
 
-    col_na = col.apply(lambda x: x in (None, 'nan', 'None'))
 
-    has_na = np.any(col_na)
+def _get_na_rate(column: pd.Series) -> float:
+    return np.count_nonzero(column.isna())
 
-    if has_na:
-        n_unique = len(np.unique(col[~col_na]))
+
+def _get_na_color(na_rate: float) -> str:
+
+    if na_rate == 0:
+        return "green"
+
+    if na_rate < 0.2:
+        return "yellow"
+
+    return "red"
+
+
+def _has_duplicates(column: pd.Series) -> bool:
+    return len(set(column.values)) < len(column)
+
+
+def _get_na_msg(na_rate: float) -> str:
+    na_col = _get_na_color(na_rate)
+    return colored(f"[{na_rate*100:.0f}% N/A]", na_col)
+
+
+def _get_dupl_msg(column: pd.Series) -> str:
+
+    if _has_duplicates(column):
+        return colored("[D]", "yellow")
+
+    return colored("[ ]", "blue")
+
+
+def _get_unique_color(n_unique: int) -> str:
+
+    if n_unique <= 1:
+        return "red"
+    if n_unique < 10:
+        return "blue"
+    if n_unique < 25:
+        return "yellow"
+
+    return "red"
+
+
+def _get_unique_msg(column: pd.Series) -> str:
+    n_unique = len(set(column.values))
+    return colored(f" [{n_unique} cls]", _get_unique_color(n_unique))
+
+
+def _get_example(column: pd.Series, na_rate: float) -> Any:
+
+    if na_rate == 0:
+        return statistics.mode(column.values)
+    if na_rate < 1:
+        return statistics.mode(column[~column.isna()].values)
+
+    return column.values[0]
+
+
+def _get_standardized_range_msg(col_max, col_min, col_stddev) -> str:
+
+    if col_stddev > 0:
+        half_standardized_range = (col_max - col_min) / col_stddev / 2
     else:
-        n_unique = len(np.unique(col))
-    is_dupl = n_unique != len(col)
+        half_standardized_range = 0
 
-    if has_na:
-        na_rate = sum(col_na) / len(col)
-        if na_rate < .2:
-            na_col = 'yellow'
-        else:
-            na_col = 'red'
-        na_msg = colored(f"[{na_rate*100:.0f}% N/A]", na_col)
+    if 0.5 < half_standardized_range < 4:
+        stdev_rng_col = "green"
+    elif 0.2 < half_standardized_range < 5:
+        stdev_rng_col = "yellow"
     else:
-        na_msg = colored(f"[0% N/A]", 'green')
+        stdev_rng_col = "red"
 
-    if is_dupl:
-        is_dupl_msg = colored('[D]', 'yellow')
+    return colored(f"{half_standardized_range:.1f}", stdev_rng_col)
+
+
+def _get_range_msg(column: pd.Series, na_rate: float) -> str:
+
+    if na_rate > 0:
+        col_stddev = np.std(column[np.isfinite(column)])
+        mean = np.mean(column[np.isfinite(column)])
     else:
-        is_dupl_msg = colored('[U]', 'blue')
-    if n_unique == 1:
-        unique_col = 'red'
-    elif n_unique < 10:
-        unique_col = 'blue'
-    elif n_unique < 25:
-        unique_col = 'yellow'
-    else:
-        unique_col = 'red'
-    unique_msg = colored(f' [{n_unique} cls]', unique_col)
-    
-    if is_numeric:
+        col_stddev = np.std(column)
+        mean = np.mean(column)
 
-        example = col[~col_na].values[0]
+    std_range_msg = _get_standardized_range_msg(column.max(), column.min(), col_stddev)
 
-        col_min = col.min()
-        col_max = col.max()
-        has_inf = np.isinf(col_max)
-        has_neginf = np.isinf(col_min)
+    return f"[{mean:.2e}±{std_range_msg}*{col_stddev:.2e}]"
 
-        if has_inf:
-            max_msg = colored('+∞', 'red')
-        else:
-            max_msg = f'{col_max:.2e}'
-        if has_neginf:
-            min_msg = colored('-∞', 'red')
-        else:
-            min_msg = f'{col_min:.2e}'
-        if has_inf or has_neginf or has_na:
-            stdev = np.std(col[np.isfinite(col)])
-            mean = np.mean(col[np.isfinite(col)])
-            mean_msg = colored(f'{mean:.2e}', 'yellow')
-        else:
-            stdev = np.std(col)
-            mean = np.mean(col)
-            mean_msg = f'{mean:.2e}'
-        
-        stdev_range = (col_max - col_min) / stdev if stdev > 0 else 0
-        if 2 < stdev_range < 5:
-            stdev_rng_col = 'green'
-        elif 1 < stdev_range < 6:
-            stdev_rng_col = 'yellow'
-        else:
-            stdev_rng_col = 'red'
-        stdev_rng_msg = colored(f'{stdev_range:.1f}', stdev_rng_col)
 
-        name = col.name
-        dtype = col.dtype
-        range_msg = f'[{min_msg}:{max_msg}]'
-        stdev_msg = f'[{mean_msg}±{stdev_rng_msg}*{stdev:.2e}]'
+def _get_max_msg(column: pd.Series) -> str:
 
-        return name, dtype, na_msg, is_dupl_msg, unique_msg, range_msg, stdev_msg, example
-        # return f'{col.name} | [{col.dtype}]{na_msg} [{min_msg}:{max_msg}] [{mean_msg}±{stdev_rng_msg}*{stdev:.2f}] | {example}'
+    col_max = column.max()
 
-    else:
-        example = col[~col_na].values[0]
+    if np.isposinf(col_max):
+        return colored("+∞", "red")
 
-        name = col.name
-        dtype = col.dtype
-        range_msg = is_dupl_msg
-        stdev_msg = unique_msg
+    return f"{col_max:.2e}"
 
-        return name, dtype, na_msg, is_dupl_msg, unique_msg, '', '', example
-        # return f'{col.name} | [{len(col)}*{col.dtype}]{na_msg}{is_dupl_msg}{unique_msg} | {example}'
+
+def _get_min_msg(column: pd.Series) -> str:
+
+    col_min = column.min()
+
+    if np.isneginf(col_min):
+        return colored("-∞", "red")
+
+    return f"{col_min:.2e}"
+
+
+def _summarize_column(column: pd.Series) -> Tuple:
+    na_rate = _get_na_rate(column)
+
+    if _is_numeric_datatype(column.dtype):
+        return {
+            "name": column.name,
+            "dtype": column.dtype,
+            "na": _get_na_msg(na_rate),
+            "duplicated": _get_dupl_msg(column),
+            "unique": _get_unique_msg(column),
+            "range": f"[{_get_min_msg(column)}:{_get_max_msg(column)}]",
+            "stddev": _get_range_msg(column, na_rate),
+            "example": " " * 6 + str(_get_example(column, na_rate)),
+        }
+
+    return {
+        "name": column.name,
+        "dtype": column.dtype,
+        "na": _get_na_msg(na_rate),
+        "duplicated": _get_dupl_msg(column),
+        "unique": _get_unique_msg(column),
+        "range": "",
+        "stddev": "",
+        "example": str(_get_example(column, na_rate)),
+    }
+
 
 def summarize(df: pd.DataFrame) -> str:
-    # Summary of dataframe contents
+    """Generate a readable summary of the columns of a pd.DataFrame.
 
-    cols = ['name', 'dtype', 'na', 'dupl', 'unique', 'range', 'stdev', 'example']
-    data = []
-    for col in df.columns:
-        data.append(_col_summary(df[col]))
-    result = pd.DataFrame(data=data, columns=cols)
+    Args:
+        df (pd.DataFrame): Dataframe to generate a summary for
 
-    # Pretty print report
-    asstr = ''
-    printable = r'abcdefghijklmnopqrstuvwxyzåäö'
-    printable += printable.upper()
-    printable += r'/ _.![]' + '0123456789' + r'±∞'
-    printable_len = lambda x: sum([_x in printable for _x in str(x)])
-    col_lengths = [result[col].apply(printable_len).max() for col in result.columns]
-    for ix in result.index:
-        for col, col_len in zip(result.columns, col_lengths):
-            cell_value = str(result.loc[ix, col])
-            asstr += cell_value + ' '*(col_len - printable_len(cell_value)) + ' '
-        asstr += '\n'
-    return asstr
+    Returns:
+        str: Generated summary
+    """
+    column_summaries = [_summarize_column(df[column]) for column in df.columns]
 
-def connect(datasets: Iterable[pd.DataFrame], names: Iterable[str]) -> pd.DataFrame:
-    assert len(datasets) >= 2
+    summary_items = list(column_summaries[0].keys())
 
-    all_cols = []
-    dtypes = []
-    for df in datasets:
-        all_cols.extend(df.columns)
-        dtypes.extend(df.dtypes.values)
-    result = pd.DataFrame(index=all_cols)
-    result['dtype'] = dtypes
-    for col in all_cols:
-        for df, name in zip(datasets, names):
-            result.loc[col, name] = '+' if col in df.columns else ''
-    return result
+    def printable_len(cell_value: Any) -> int:
+        """How many characters wide a value will be when printed to the terminal.
+
+        Args:
+            cell_value (Any): value to find width of
+
+        Returns:
+            int: The width the value will be when printed to the terminal
+        """
+        return sum(char in string.printable for char in str(cell_value))
+
+    column_lengths = {
+        column: max(printable_len(summary[column]) for summary in column_summaries)
+        for column in summary_items
+    }
+
+    rows = []
+    for summary in column_summaries:
+        row_values = []
+        for column in summary_items:
+            cell_value = str(summary[column])
+            row_values.append(
+                cell_value + " " * (column_lengths[column] - printable_len(cell_value))
+            )
+        rows.append("".join(row_values))
+
+    return "\n".join(rows)
+
+
+def connect(
+    dataframes: Iterable[pd.DataFrame], names: Iterable[str] = None
+) -> pd.DataFrame:
+    """Infer foreign key-like relationships between different dataframes.
+
+    Args:
+        datasets (Iterable[pd.DataFrame]): _description_
+        names (Iterable[str]): _description_
+
+    Returns:
+        pd.DataFrame: _description_
+    """
+    if names is None:
+        names = map(str, range(1_000_000_000))
+
+    colummn_mapping = {
+        name: dataframe.dtypes.to_dict() for dataframe, name in zip(dataframes, names)
+    }
+
+    columns = set(
+        itertools.chain.from_iterable(
+            mapping.keys() for mapping in colummn_mapping.values()
+        )
+    )
+
+    connections = pd.DataFrame(columns=columns, index=colummn_mapping.keys())
+
+    for name, mapping in colummn_mapping.items():
+        for column in columns:
+            dtype = mapping.get(column, None)
+            dtype = str(dtype)
+            if dtype == "None":
+                dtype = ""
+            if dtype == "string":
+                dtype = "str"
+            connections.loc[name, column] = dtype
+
+    return connections
