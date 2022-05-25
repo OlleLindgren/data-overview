@@ -81,6 +81,8 @@ def main(args: Sequence[str]) -> int:
 
         print(dataoverview.explore.connect(dataframe_iterator, filename_iterator))
 
+    return 0
+
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))
