@@ -7,9 +7,9 @@ from typing import Any, Iterable, Tuple
 
 import numpy as np
 import pandas as pd
+from termcolor import colored
 
 pd.options.mode.use_inf_as_na = True
-from termcolor import colored
 
 
 def _is_numeric_datatype(datatype) -> bool:
@@ -153,16 +153,16 @@ def _summarize_column(column: pd.Series) -> Tuple:
     }
 
 
-def summarize(df: pd.DataFrame) -> str:
+def summarize(dataframe: pd.DataFrame) -> str:
     """Generate a readable summary of the columns of a pd.DataFrame.
 
     Args:
-        df (pd.DataFrame): Dataframe to generate a summary for
+        dataframe (pd.DataFrame): Dataframe to generate a summary for
 
     Returns:
         str: Generated summary
     """
-    column_summaries = [_summarize_column(df[column]) for column in df.columns]
+    column_summaries = [_summarize_column(dataframe[column]) for column in dataframe.columns]
 
     summary_items = list(column_summaries[0].keys())
 
@@ -195,9 +195,7 @@ def summarize(df: pd.DataFrame) -> str:
     return "\n".join(rows)
 
 
-def connect(
-    dataframes: Iterable[pd.DataFrame], names: Iterable[str] = None
-) -> pd.DataFrame:
+def connect(dataframes: Iterable[pd.DataFrame], names: Iterable[str] = None) -> pd.DataFrame:
     """Infer foreign key-like relationships between different dataframes.
 
     Args:
@@ -215,9 +213,7 @@ def connect(
     }
 
     columns = set(
-        itertools.chain.from_iterable(
-            mapping.keys() for mapping in colummn_mapping.values()
-        )
+        itertools.chain.from_iterable(mapping.keys() for mapping in colummn_mapping.values())
     )
 
     connections = pd.DataFrame(columns=columns, index=colummn_mapping.keys())

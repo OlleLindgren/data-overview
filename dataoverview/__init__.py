@@ -1,2 +1,2 @@
-from .explore import summarize, connect
-from .masking import mask, na, inf, filter, MaskEntry, MaskEntries
+from .explore import connect, summarize
+from .masking import MaskEntries, MaskEntry, filter, inf, mask, na

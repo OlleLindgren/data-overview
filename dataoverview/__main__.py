@@ -1,10 +1,9 @@
 import argparse
-from pathlib import Path
 import sys
+from pathlib import Path
 from typing import Iterable, Sequence
 
 import pandas as pd
-
 
 import dataoverview.explore
 
@@ -37,12 +36,12 @@ def _iter_dataframes(path: Path) -> Iterable[pd.DataFrame]:
     for filename in path.iterdir():
         if filename.is_file():
             try:
-                df = pd.read_csv(filename)
+                dataframe = pd.read_csv(filename)
             except (IndexError, pd.errors.EmptyDataError):
                 continue
-            if not len(df) or not len(df.columns):
+            if len(dataframe) == 0 or len(dataframe.columns) == 0:
                 continue
-            yield df, filename
+            yield dataframe, filename
 
 
 def main(args: Sequence[str]) -> int:
@@ -81,6 +80,7 @@ def main(args: Sequence[str]) -> int:
         dataframe_iterator = (dataframe.convert_dtypes() for dataframe in dataframe_iterator)
 
         print(dataoverview.explore.connect(dataframe_iterator, filename_iterator))
+
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))
