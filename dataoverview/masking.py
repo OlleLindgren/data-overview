@@ -1,3 +1,5 @@
+"""Quickly visualizing a dataset based on applying masks to it and looking for segments."""
+
 from collections import Counter, namedtuple
 from typing import Callable
 
@@ -165,11 +167,7 @@ def mask(dataframe: pd.DataFrame, masking_function: Callable[[object], str]) -> 
     max_ix_name_len = max(map(len, strmask.index.astype(str)))
     index_spacing = max(max_ix_name_len, max_col_name_len)
 
-    return (
-        _df_head_format(dataframe, index_spacing)
-        + "\n"
-        + _df_format(strmask, index_spacing)
-    )
+    return _df_head_format(dataframe, index_spacing) + "\n" + _df_format(strmask, index_spacing)
 
 
 def na(dataframe: pd.DataFrame) -> str:

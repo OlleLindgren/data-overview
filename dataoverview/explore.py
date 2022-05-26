@@ -1,18 +1,19 @@
+"""Code related to quick initial exploring of a dataset."""
+
 from __future__ import annotations
 
 import itertools
 import statistics
+from pathlib import Path
 from typing import Any, Iterable, Tuple
 
 import numpy as np
 import pandas as pd
 from termcolor import colored
 
+from . import paths
+
 pd.options.mode.use_inf_as_na = True
-
-
-def _is_numeric_datatype(datatype) -> bool:
-    return pd.api.types.is_float_dtype(datatype)
 
 
 def _get_na_rate(column: pd.Series) -> float:
@@ -20,7 +21,6 @@ def _get_na_rate(column: pd.Series) -> float:
 
 
 def _get_na_color(na_rate: float) -> str:
-
     if na_rate == 0:
         return "green"
 
@@ -40,7 +40,6 @@ def _get_na_msg(na_rate: float) -> str:
 
 
 def _get_dupl_msg(column: pd.Series) -> str:
-
     if _has_duplicates(column):
         return colored("[D]", "yellow")
 
@@ -48,7 +47,6 @@ def _get_dupl_msg(column: pd.Series) -> str:
 
 
 def _get_unique_color(n_unique: int) -> str:
-
     if n_unique <= 1:
         return "red"
     if n_unique < 10:
@@ -65,64 +63,12 @@ def _get_unique_msg(column: pd.Series) -> str:
 
 
 def _get_example(column: pd.Series, na_rate: float) -> Any:
-
     if na_rate == 0:
         return statistics.mode(column.values)
     if na_rate < 1:
         return statistics.mode(column[~column.isna()].values)
 
     return column.values[0]
-
-
-def _get_standardized_range_msg(col_max, col_min, col_stddev) -> str:
-
-    if col_stddev > 0:
-        half_standardized_range = (col_max - col_min) / col_stddev / 2
-    else:
-        half_standardized_range = 0
-
-    if 0.5 < half_standardized_range < 4:
-        stdev_rng_col = "green"
-    elif 0.2 < half_standardized_range < 5:
-        stdev_rng_col = "yellow"
-    else:
-        stdev_rng_col = "red"
-
-    return colored(f"{half_standardized_range:.1f}", stdev_rng_col)
-
-
-def _get_range_msg(column: pd.Series, na_rate: float) -> str:
-
-    if na_rate > 0:
-        col_stddev = np.std(column[np.isfinite(column)])
-        mean = np.mean(column[np.isfinite(column)])
-    else:
-        col_stddev = np.std(column)
-        mean = np.mean(column)
-
-    std_range_msg = _get_standardized_range_msg(column.max(), column.min(), col_stddev)
-
-    return f"[{mean:.2e}±{std_range_msg}*{col_stddev:.2e}]"
-
-
-def _get_max_msg(column: pd.Series) -> str:
-
-    col_max = column.max()
-
-    if np.isposinf(col_max):
-        return colored("+∞", "red")
-
-    return f"{col_max:.2e}"
-
-
-def _get_min_msg(column: pd.Series) -> str:
-
-    col_min = column.min()
-
-    if np.isneginf(col_min):
-        return colored("-∞", "red")
-
-    return f"{col_min:.2e}"
 
 
 def _summarize_column(column: pd.Series) -> Tuple:
@@ -179,9 +125,7 @@ def summarize(dataframe: pd.DataFrame) -> str:
     Returns:
         str: Generated summary
     """
-    column_summaries = [
-        _summarize_column(dataframe[column]) for column in dataframe.columns
-    ]
+    column_summaries = [_summarize_column(dataframe[column]) for column in dataframe.columns]
 
     summary_items = list(column_summaries[0].keys())
 
@@ -193,18 +137,13 @@ def summarize(dataframe: pd.DataFrame) -> str:
     rows = []
     for summary in column_summaries:
         rows.append(
-            "".join(
-                str(summary[column]).ljust(column_widths[column])
-                for column in summary_items
-            )
+            "".join(str(summary[column]).ljust(column_widths[column]) for column in summary_items)
         )
 
     return "\n".join(rows)
 
 
-def connect(
-    dataframes: Iterable[pd.DataFrame], names: Iterable[str] = None
-) -> pd.DataFrame:
+def connect(dataframes: Iterable[pd.DataFrame], names: Iterable[str] = None) -> pd.DataFrame:
     """Infer foreign key-like relationships between different dataframes.
 
     Args:
@@ -222,9 +161,7 @@ def connect(
     }
 
     columns = set(
-        itertools.chain.from_iterable(
-            mapping.keys() for mapping in colummn_mapping.values()
-        )
+        itertools.chain.from_iterable(mapping.keys() for mapping in colummn_mapping.values())
     )
 
     connections = pd.DataFrame(columns=columns, index=colummn_mapping.keys())
@@ -240,3 +177,39 @@ def connect(
             connections.loc[name, column] = dtype
 
     return connections
+
+
+def connect_from_path(directory: Path) -> str:
+    """Run connect on every pd.DataFrame found in a directory.
+
+    Args:
+        directory (Path): Directory to search for .csv files to parse
+
+    Returns:
+        str: Formatted output of connect.
+    """
+    dataframe_iterator, filename_iterator = zip(*paths.iter_dataframes(directory))
+
+    filename_iterator = (filename.relative_to(directory) for filename in filename_iterator)
+    dataframe_iterator = (dataframe.convert_dtypes() for dataframe in dataframe_iterator)
+
+    return connect(dataframe_iterator, filename_iterator)
+
+
+def summarize_from_path(path: Path) -> Iterable[str]:
+    """Run summarize on a single file, or all .csv files in a single directory.
+
+    Args:
+        path (Path): Filename of a .csv file, or directory to search for .csv files
+
+    Yields:
+        str: Formatted output of summarize()
+    """
+    if path.is_file():
+        yield summarize(pd.read_csv(path).convert_dtypes())
+    if path.is_dir():
+        count = 0
+        for dataframe, filename in paths.iter_dataframes(path):
+            yield filename.relative_to(path)
+            yield summarize(dataframe.convert_dtypes())
+            count += 1
